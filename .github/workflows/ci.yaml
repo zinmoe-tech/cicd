@@ -13,5 +13,14 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Show current directory
+        run: pwd
+
+      - name: Show repository files
+        run: ls -la
+
+      - name: Show operating system
+        run: uname -a
+
       - name: Run first CI command
         run: echo "CI pipeline is working"
