@@ -1,4 +1,4 @@
-name: My First CI Pipeline
+name: Python CI Pipeline
 
 on:
   push:
@@ -13,14 +13,15 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Show current directory
-        run: pwd
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
 
-      - name: Show repository files
-        run: ls -la
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
 
-      - name: Show operating system
-        run: uname -a
-
-      - name: Run first CI command
-        run: echo "CI pipeline is working"
+      - name: Run automated tests
+        run: pytest
