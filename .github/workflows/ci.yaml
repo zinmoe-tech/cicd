@@ -6,7 +6,7 @@ on:
       - main
 
 jobs:
-  test:
+  test-and-build:
     runs-on: ubuntu-latest
 
     steps:
@@ -25,3 +25,9 @@ jobs:
 
       - name: Run automated tests
         run: pytest
+
+      - name: Build Docker image
+        run: docker build -t cicd-python-app:${{ github.sha }} .
+
+      - name: Show Docker images
+        run: docker images
