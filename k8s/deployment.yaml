@@ -1,0 +1,23 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cicd-python-app
+
+spec:
+  replicas: 2
+
+  selector:
+    matchLabels:
+      app: cicd-python-app
+
+  template:
+    metadata:
+      labels:
+        app: cicd-python-app
+
+    spec:
+      containers:
+        - name: cicd-python-app
+          image: 691914216603.dkr.ecr.us-east-1.amazonaws.com/cicd-python-app:0524a9a35392fd9ca65a4fd161b8cb28b6b7c14e
+          ports:
+            - containerPort: 5000
