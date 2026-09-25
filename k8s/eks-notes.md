@@ -7,7 +7,7 @@ aws eks update-kubeconfig \
   --profile eks-admin
 
 kubectl config get-contexts
-kubectl config use-context pipeline-project-cluster
+kubectl config use-context cicd-eks-cluster
 kubectl get nodes
 
 Check your EKS node groups:
