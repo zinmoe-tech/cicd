@@ -1,4 +1,4 @@
-name: Python CI Pipeline
+name: Python CI/CD Pipeline
 
 on:
   push:
@@ -10,7 +10,7 @@ permissions:
   contents: read
 
 jobs:
-  test-build-push:
+  test-build-push-deploy:
     runs-on: ubuntu-latest
 
     steps:
@@ -28,52 +28,8 @@ jobs:
           pip install -r requirements.txt
 
       - name: Run automated tests
-        run: pytest
-
-      - name: Inspect GitHub OIDC claims
-        shell: bash
         run: |
-          echo "Requesting GitHub OIDC token..."
-
-          RESPONSE=$(curl -sS \
-            -H "Authorization: Bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
-            "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=sts.amazonaws.com")
-
-          TOKEN=$(echo "$RESPONSE" | jq -r '.value')
-
-          if [ "$TOKEN" = "null" ] || [ -z "$TOKEN" ]; then
-            echo "Failed to obtain GitHub OIDC token"
-            echo "$RESPONSE"
-            exit 1
-          fi
-
-          PAYLOAD=$(echo "$TOKEN" | cut -d '.' -f2)
-
-          PAYLOAD=$(echo "$PAYLOAD" | tr '_-' '/+')
-
-          case $((${#PAYLOAD} % 4)) in
-            2)
-              PAYLOAD="${PAYLOAD}=="
-              ;;
-            3)
-              PAYLOAD="${PAYLOAD}="
-              ;;
-          esac
-
-          echo "GitHub OIDC claims:"
-          echo "$PAYLOAD" | base64 -d | jq '{
-            iss,
-            aud,
-            sub,
-            repository,
-            repository_id,
-            repository_owner,
-            repository_owner_id,
-            ref,
-            sha,
-            workflow,
-            actor
-          }'
+          pytest python-code/
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
@@ -87,11 +43,8 @@ jobs:
           echo "AWS identity:"
           aws sts get-caller-identity
 
-          echo "AWS region:"
+          echo "Configured AWS region:"
           echo "$AWS_REGION"
-
-          echo "Credential expiration:"
-          echo "$AWS_CREDENTIAL_EXPIRATION"
 
       - name: Login to Amazon ECR
         id: login-ecr
@@ -103,7 +56,7 @@ jobs:
           ECR_REPOSITORY: ${{ vars.ECR_REPOSITORY }}
           IMAGE_TAG: ${{ github.sha }}
         run: |
-          echo "Building image..."
+          echo "Building image:"
           echo "$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG"
 
           docker build \
@@ -111,7 +64,8 @@ jobs:
             .
 
       - name: Show Docker images
-        run: docker images
+        run: |
+          docker images
 
       - name: Push Docker image to ECR
         env:
@@ -119,7 +73,8 @@ jobs:
           ECR_REPOSITORY: ${{ vars.ECR_REPOSITORY }}
           IMAGE_TAG: ${{ github.sha }}
         run: |
-          echo "Pushing Docker image to Amazon ECR..."
+          echo "Pushing image:"
+          echo "$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG"
 
           docker push \
             "$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG"
@@ -139,10 +94,34 @@ jobs:
             --name cicd-eks-cluster \
             --region ap-southeast-1
 
-      - name: Deploy new image to EKS
+      - name: Check EKS connection
         run: |
-          kubectl set image deployment/cicd-python-app \
-            cicd-python-app=691914216603.dkr.ecr.us-east-1.amazonaws.com/cicd-python-app:${{ github.sha }}
+          echo "Current Kubernetes context:"
+          kubectl config current-context
+
+          echo "Cluster nodes:"
+          kubectl get nodes
+
+          echo "Existing deployments:"
+          kubectl get deployments -A
+
+      - name: Deploy application to EKS
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          ECR_REPOSITORY: ${{ vars.ECR_REPOSITORY }}
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          IMAGE_URI="$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG"
+
+          echo "Deploying image:"
+          echo "$IMAGE_URI"
+
+          sed "s|IMAGE_URI|$IMAGE_URI|g" \
+            k8s/deployment.yaml | kubectl apply -f -
+
+      - name: Apply Kubernetes Service
+        run: |
+          kubectl apply -f k8s/service.yaml
 
       - name: Wait for rollout
         run: |
@@ -151,9 +130,20 @@ jobs:
 
       - name: Verify deployed image
         run: |
+          echo "Image currently configured in EKS:"
+
           kubectl get deployment cicd-python-app \
             -o jsonpath='{.spec.template.spec.containers[0].image}{"\n"}'
 
-      - name: Show running pods
+      - name: Show Kubernetes resources
         run: |
-          kubectl get pods -l app=cicd-python-app -o wide
+          echo "Deployment:"
+          kubectl get deployment cicd-python-app
+
+          echo "Pods:"
+          kubectl get pods \
+            -l app=cicd-python-app \
+            -o wide
+
+          echo "Service:"
+          kubectl get svc cicd-python-service

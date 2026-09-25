@@ -18,6 +18,6 @@ spec:
     spec:
       containers:
         - name: cicd-python-app
-          image: 691914216603.dkr.ecr.us-east-1.amazonaws.com/cicd-python-app:9e5c87a62d075fbcf0abb03836160b98841872fe
+          image: IMAGE_URI
           ports:
             - containerPort: 5000
