@@ -150,10 +150,10 @@ jobs:
             --timeout=180s
 
       - name: Verify deployed image
-          run: |
-            kubectl get deployment cicd-python-app \
-              -o jsonpath='{.spec.template.spec.containers[0].image}{"\n"}'
+        run: |
+          kubectl get deployment cicd-python-app \
+            -o jsonpath='{.spec.template.spec.containers[0].image}{"\n"}'
 
       - name: Show running pods
-          run: |
-            kubectl get pods -l app=cicd-python-app -o wide
+        run: |
+          kubectl get pods -l app=cicd-python-app -o wide
