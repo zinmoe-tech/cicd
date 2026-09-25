@@ -132,3 +132,28 @@ jobs:
         run: |
           echo "Successfully pushed:"
           echo "$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG"
+
+      - name: Update kubeconfig for EKS
+        run: |
+        aws eks update-kubeconfig \
+        --name cicd-eks-cluster \
+        --region ap-southeast-1
+
+      - name: Deploy new image to EKS
+        run: |
+          kubectl set image deployment/cicd-python-app \
+            cicd-python-app=691914216603.dkr.ecr.us-east-1.amazonaws.com/cicd-python-app:${{ github.sha }}
+
+      - name: Wait for rollout
+        run: |
+          kubectl rollout status deployment/cicd-python-app \
+            --timeout=180s
+
+      - name: Verify deployed image
+          run: |
+            kubectl get deployment cicd-python-app \
+              -o jsonpath='{.spec.template.spec.containers[0].image}{"\n"}'
+
+      - name: Show running pods
+          run: |
+            kubectl get pods -l app=cicd-python-app -o wide
