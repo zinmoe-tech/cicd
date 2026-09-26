@@ -1,9 +1,17 @@
 >>> Creater EKS cluster and config assess management and update kubeconfig
 
+eksctl create cluster \
+  --name cicd-eks-cluster \
+  --region ap-southeast-1 \
+  --version 1.34 \
+  --instance-types t3.medium \
+  --nodes-min 2 \
+  --profile eks-admin
+
 aws eks update-kubeconfig \
-  --region us-east-1 \
-  --name pipeline-project-cluster \
-  --alias pipeline-project-cluster \
+  --region ap-southeast-1 \
+  --name cicd-eks-cluster \
+  --alias cicd-eks-cluster \
   --profile eks-admin
 
 kubectl config get-contexts
