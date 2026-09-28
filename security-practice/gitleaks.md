@@ -11,6 +11,9 @@ Change it to:
   with:
     fetch-depth: 0
 
+- name: Secret scan with Gitleaks
+  uses: gitleaks/gitleaks-action@v2
+
 Why fetch-depth: 0?
 Normally GitHub Actions may only retrieve the latest commit.
 For security scanning, we also want to inspect Git history:
