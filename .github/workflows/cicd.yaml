@@ -94,7 +94,7 @@ jobs:
         run: |
           aws eks update-kubeconfig \
             --name cicd-eks-cluster \
-            --region ap-southeast-1
+            --region us-east-1
 
       - name: Check EKS connection
         run: |
