@@ -104,11 +104,8 @@ jobs:
           echo "Current Kubernetes context:"
           kubectl config current-context
 
-          echo "Cluster nodes:"
-          kubectl get nodes
-
-          echo "Existing deployments:"
-          kubectl get deployments -A
+          echo "Existing deployments in the application namespace:"
+          kubectl get deployments --namespace default
 
       - name: Deploy application to EKS
         env:
@@ -151,4 +148,4 @@ jobs:
             -o wide
 
           echo "Service:"
-          kubectl get svc cicd-python-service
+          kubectl get svc cicd-python-app
