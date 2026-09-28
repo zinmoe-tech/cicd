@@ -2,14 +2,14 @@
 
 eksctl create cluster \
   --name cicd-eks-cluster \
-  --region ap-southeast-1 \
+  --region us-east-1 \
   --version 1.34 \
   --instance-types t3.medium \
   --nodes-min 2 \
   --profile eks-admin
 
 aws eks update-kubeconfig \
-  --region ap-southeast-1 \
+  --region us-east-1 \
   --name cicd-eks-cluster \
   --alias cicd-eks-cluster \
   --profile eks-admin
@@ -22,7 +22,7 @@ Check your EKS node groups:
 
 aws eks list-nodegroups \
   --region us-east-1 \
-  --cluster-name pipeline-project-cluster \
+  --cluster-name cicd-eks-cluster \
   --profile eks-admin
 
 If it returns:
@@ -30,4 +30,4 @@ If it returns:
   "nodegroups": []
 }
 
-arn:aws:eks:us-east-1:691914216603:cluster/pipeline-project-cluster
+arn:aws:eks:us-east-1:691914216603:cluster/cicd-eks-cluster
