@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+      - gitleaks-test
 
 permissions:
   id-token: write
