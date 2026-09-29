@@ -1,0 +1,12 @@
+title = "CI/CD Repository Gitleaks Policy"
+
+[extend]
+useDefault = true
+
+#Gitleaks default rules
+       
+#AWS keys
+#GitHub tokens
+#API credentials
+#private keys
+#other common secrets

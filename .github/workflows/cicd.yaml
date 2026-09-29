@@ -1,4 +1,4 @@
-name: Python CI/CD Pipeline
+name: Production CI/CD
 
 on:
   push:
@@ -14,13 +14,30 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+
+      # =====================================================
+      # SOURCE
+      # =====================================================
+
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Secret scan with Gitleaks
-        uses: gitleaks/gitleaks-action@v2
+
+      # =====================================================
+      # SECURITY GATE 1 - SECRET SCANNING
+      # =====================================================
+
+      - name: Scan repository for secrets
+        uses: gitleaks/gitleaks-action@v3
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+
+      # =====================================================
+      # APPLICATION TESTING
+      # =====================================================
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -36,6 +53,11 @@ jobs:
         run: |
           pytest python-code/
 
+
+      # =====================================================
+      # AWS AUTHENTICATION
+      # =====================================================
+
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
@@ -48,8 +70,13 @@ jobs:
           echo "AWS identity:"
           aws sts get-caller-identity
 
-          echo "Configured AWS region:"
+          echo "AWS region:"
           echo "$AWS_REGION"
+
+
+      # =====================================================
+      # ECR
+      # =====================================================
 
       - name: Login to Amazon ECR
         id: login-ecr
@@ -61,11 +88,13 @@ jobs:
           ECR_REPOSITORY: ${{ vars.ECR_REPOSITORY }}
           IMAGE_TAG: ${{ github.sha }}
         run: |
-          echo "Building image:"
-          echo "$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG"
+          IMAGE_URI="$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG"
+
+          echo "Building:"
+          echo "$IMAGE_URI"
 
           docker build \
-            -t "$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG" \
+            -t "$IMAGE_URI" \
             .
 
       - name: Show Docker images
@@ -78,20 +107,17 @@ jobs:
           ECR_REPOSITORY: ${{ vars.ECR_REPOSITORY }}
           IMAGE_TAG: ${{ github.sha }}
         run: |
-          echo "Pushing image:"
-          echo "$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG"
+          IMAGE_URI="$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG"
 
-          docker push \
-            "$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG"
+          echo "Pushing:"
+          echo "$IMAGE_URI"
 
-      - name: Show pushed image
-        env:
-          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-          ECR_REPOSITORY: ${{ vars.ECR_REPOSITORY }}
-          IMAGE_TAG: ${{ github.sha }}
-        run: |
-          echo "Successfully pushed:"
-          echo "$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG"
+          docker push "$IMAGE_URI"
+
+
+      # =====================================================
+      # EKS
+      # =====================================================
 
       - name: Update kubeconfig for EKS
         run: |
@@ -104,8 +130,16 @@ jobs:
           echo "Current Kubernetes context:"
           kubectl config current-context
 
-          echo "Existing deployments in the application namespace:"
+          echo "Nodes:"
+          kubectl get nodes
+
+          echo "Existing deployments:"
           kubectl get deployments --namespace default
+
+
+      # =====================================================
+      # DEPLOY
+      # =====================================================
 
       - name: Deploy application to EKS
         env:
@@ -115,7 +149,7 @@ jobs:
         run: |
           IMAGE_URI="$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG"
 
-          echo "Deploying image:"
+          echo "Deploying:"
           echo "$IMAGE_URI"
 
           sed "s|IMAGE_URI|$IMAGE_URI|g" \
@@ -125,6 +159,11 @@ jobs:
         run: |
           kubectl apply -f k8s/service.yaml
 
+
+      # =====================================================
+      # DEPLOYMENT VERIFICATION
+      # =====================================================
+
       - name: Wait for rollout
         run: |
           kubectl rollout status deployment/cicd-python-app \
@@ -132,7 +171,7 @@ jobs:
 
       - name: Verify deployed image
         run: |
-          echo "Image currently configured in EKS:"
+          echo "Image running in EKS:"
 
           kubectl get deployment cicd-python-app \
             -o jsonpath='{.spec.template.spec.containers[0].image}{"\n"}'
@@ -142,10 +181,12 @@ jobs:
           echo "Deployment:"
           kubectl get deployment cicd-python-app
 
+          echo ""
           echo "Pods:"
           kubectl get pods \
             -l app=cicd-python-app \
             -o wide
 
+          echo ""
           echo "Service:"
-          kubectl get svc cicd-python-app
+          kubectl get svc cicd-python-service
